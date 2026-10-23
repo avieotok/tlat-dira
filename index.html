@@ -2390,14 +2390,14 @@ function renderList(){
   const canCreate=!!db||(STANDALONE&&!!sample);
   side.innerHTML=`<p class="muted">כל פרויקט נשמר כאן ונשאר זמין גם בכניסה הבאה. אפשר להעלות דירה בקומה אחת או דופלקס עם שרטוט לכל קומה.</p>
   ${canCreate?'<button class="primary" id="newBtn">+ פרויקט חדש</button>':(offline?(STANDALONE?'<p class="muted"><b>גרסה עצמאית.</b> הפרויקטים נשמרים בדפדפן הזה. כדי לנתח שרטוט חדש, הזינו מפתח API בהגדרות למטה.</p><button class="primary" id="needKey">הגדרת חיבור ל־Claude</button>':'<p class="muted"><b>גרסה מקומית.</b> הפרויקטים והשינויים נשמרים בדפדפן הזה. ניתוח של שרטוט חדש זמין באפליקציה ב־Claude, ומשם אפשר לייצא פרויקט ולייבא אותו לכאן.</p>'):'<p class="muted">כדי לשמור פרויקטים יש להיכנס לחשבון Claude.</p>')}
-  ${(offline||canCreate)?'<label class="ghost" style="text-align:center;cursor:pointer;display:block">ייבוא פרויקט מקובץ<input type="file" id="importFile" accept=".json,application/json" hidden></label>':''}
+  ${(offline||canCreate)?'<label class="ghost" style="text-align:center;cursor:pointer;display:block">ייבוא מקובץ: תמונה, PDF או פרויקט<input type="file" id="importFile" accept="image/*,.heic,.heif,.pdf,application/pdf,.json,application/json" hidden></label>':''}
   <h2>הפרויקטים שלי</h2>
   ${projects.length?'<button class="ghost" id="cmpBtn">השוואה בין הדירות</button>':''}
   <div class="plist" id="plist">${projects.length?'':'<p class="muted">עדיין אין פרויקטים. התחילו בהעלאת שרטוט.</p>'}</div>`;
   if(STANDALONE){const sb=document.createElement('div');sb.className='sect';side.appendChild(sb);if(showSettings||!sample)renderSettings(sb);else{sb.innerHTML='<button class="ghost" id="openSet">הגדרות חיבור ל־Claude</button>';$('openSet').onclick=()=>{showSettings=true;renderSide();};}}
   if($('needKey'))$('needKey').onclick=()=>{const el=$('apiKey');if(el){el.focus();el.scrollIntoView({block:'center'});}};
   if($('cmpBtn'))$('cmpBtn').onclick=openCompare;
-  if($('importFile'))$('importFile').onchange=e=>{const f=e.target.files[0];if(f)importProject(f);};
+  if($('importFile'))$('importFile').onchange=e=>{const f=e.target.files[0];if(f)importAny(f);};
   if(canCreate)$('newBtn').onclick=()=>{newForm={name:'',kind:'apartment',floors:[{label:'',file:null,prev:null}]};view='new';renderSide();};
   const pl=$('plist');
   projects.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).forEach(p=>{const b=document.createElement('button');b.className='pcard';
@@ -2432,6 +2432,7 @@ function renderNew(){
     $('file-'+i).onchange=e=>{const f=e.target.files[0];if(!f)return;if(isJson(f)){importProject(f);return;}setFloorFile(F,i,f);};
     if($('pg-'+i))$('pg-'+i).onchange=e=>setFloorPage(F,i,+e.target.value);});
   $('goBtn').onclick=createProject;
+  if(STANDALONE&&!sample){const sb=document.createElement('div');sb.className='sect';side.appendChild(sb);renderSettings(sb);}
   if(busy)showBusy();
 }
 function showBusy(){const b=$('busyBox');if(!b)return;b.innerHTML=busy?`<div class="status"><span class="spinner"></span><span>${esc(busy)}</span></div><button class="ghost" id="stopBtn" style="margin-top:6px">עצור</button>`:'';
@@ -2502,7 +2503,7 @@ function renderProject(){
     ${(offline||downloads)?'<button class="primary" id="pdfBtn">ייצוא ל־PDF</button>':''}
     ${(offline||downloads)?'<button class="ghost" id="vidBtn">ייצוא סרטון סיור (16 שניות)</button>':''}
     ${(offline||downloads)?'<button class="ghost" id="exportBtn">ייצוא הפרויקט לקובץ (לגיבוי והעברה)</button>':''}
-    ${(offline||db)?'<label class="ghost" style="text-align:center;cursor:pointer;display:block">ייבוא פרויקט מקובץ<input type="file" id="importFile2" accept=".json,application/json" hidden></label>':''}
+    ${(offline||db)?'<label class="ghost" style="text-align:center;cursor:pointer;display:block">ייבוא מקובץ: תמונה, PDF או פרויקט<input type="file" id="importFile2" accept="image/*,.heic,.heif,.pdf,application/pdf,.json,application/json" hidden></label>':''}
     <button class="ghost danger" id="delBtn">${delArm>Date.now()?'לחצו שוב למחיקה סופית':'מחק פרויקט'}</button></div>`;
   $('backBtn').onclick=()=>{if(!busy)closeProject();};
   side.querySelectorAll('.rlist button').forEach(b=>b.onclick=()=>{const fi=+b.dataset.fi,elev=floorSel<0?fi*3:0;const t=new THREE.Vector3(+b.dataset.x,elev+.4,+b.dataset.z).add(world.position);
@@ -2517,7 +2518,7 @@ function renderProject(){
     if(n===p.name){say('הפרויקט שמור בשם "'+n+'"');return;}p.name=n;queueSave();renderSide();say('הפרויקט נשמר בשם "'+n+'"');};
   $('saveCopy').onclick=()=>saveCopy(p,$('projName').value.trim());
   side.querySelectorAll('.skin').forEach(b=>b.onclick=()=>{p.skin=b.dataset.skin;applySkin(p.skin);applyWallColor();queueSave();side.querySelectorAll('.skin').forEach(x=>x.setAttribute('aria-pressed',x===b));say('סגנון: '+b.textContent.trim());});
-  if($('importFile2'))$('importFile2').onchange=e=>{const f=e.target.files[0];if(f)importProject(f);};
+  if($('importFile2'))$('importFile2').onchange=e=>{const f=e.target.files[0];if(f)importAny(f);};
   if(curF&&$('rebuildBtn'))$('rebuildBtn').onclick=()=>reAnalyse(ef,null);
   if($('fixBtn'))$('fixBtn').onclick=()=>{const t=$('fixTxt').value.trim();if(!t){say('כתבו מה לשנות');return;}reAnalyse(ef,t);};
   $('delBtn').onclick=async()=>{if(delArm<Date.now()){delArm=Date.now()+4000;renderProject();setTimeout(()=>{if(view==='project')renderProject();},4100);return;}
@@ -2553,6 +2554,16 @@ async function exportProject(p){
     if(downloads&&!offline){await downloads.save({filename:name,data:new Blob([out],{type:'application/json'})});say('הקובץ נשמר');}
     else{const u=URL.createObjectURL(new Blob([out],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);}
   }catch(e){if(!(e&&e.code==='cancelled'))say('הייצוא לא הושלם');}}
+function importAny(f){
+  if(isJson(f)){importProject(f);return;}
+  if(isCad(f)){say(fileErr(null,f));return;}
+  if(busy)return;
+  if(project)closeProject();
+  newForm={name:f.name.replace(/\.[^.]+$/,''),kind:'apartment',floors:[{label:'',file:null,prev:null}]};view='new';renderSide();
+  setFloorFile(newForm,0,f).then(()=>{const fl=newForm&&newForm.floors[0];if(!fl||!fl.blob)return;
+    if(!sample){say(STANDALONE?'השרטוט נטען. כדי לנתח אותו, הזינו מפתח API בהגדרות החיבור ל־Claude.':'השרטוט נטען, אבל ניתוח זמין רק באפליקציה ב־Claude.');return;}
+    say('השרטוט נטען. בדקו את השם והסוג ולחצו "בנה הדמיה".');});
+}
 async function importProject(file){
   try{const j=JSON.parse(await file.text());if(!j||j.format!=='tlat-dira'||!j.doc)throw 0;
     const id='p'+Date.now().toString(36),d=j.doc;
